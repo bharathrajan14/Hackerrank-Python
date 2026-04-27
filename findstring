@@ -1,0 +1,84 @@
+import sys
+
+def findStrings(w, queries):
+    # Combine strings with a unique separator that doesn't occur in 'a'-'z'
+    combined = ""
+    for s in w:
+        combined += s + "$"
+    
+    n = len(combined)
+    
+    # 1. Build Suffix Array O(N log N)
+    sa = list(range(n))
+    rank = [ord(c) for c in combined]
+    k_val = 1
+    while k_val < n:
+        # Sort based on rank pairs
+        key = lambda x: (rank[x], rank[x + k_val] if x + k_val < n else -1)
+        sa.sort(key=key)
+        
+        new_rank = [0] * n
+        for i in range(1, n):
+            new_rank[sa[i]] = new_rank[sa[i-1]] + (1 if key(sa[i-1]) < key(sa[i]) else 0)
+        rank = new_rank
+        if rank[sa[n-1]] == n - 1: break
+        k_val *= 2
+
+    # 2. Build LCP Array (Kasai's Algorithm)
+    lcp = [0] * n
+    inv_sa = [0] * n
+    for i in range(n): inv_sa[sa[i]] = i
+    h = 0
+    for i in range(n):
+        if inv_sa[i] > 0:
+            j = sa[inv_sa[i] - 1]
+            while i + h < n and j + h < n and combined[i+h] == combined[j+h]:
+                h += 1
+            lcp[inv_sa[i]] = h
+            if h > 0: h -= 1
+            
+    # 3. Identify unique substrings and cumulative counts
+    intervals = []
+    total_distinct = 0
+    for i in range(n):
+        suffix_idx = sa[i]
+        if combined[suffix_idx] == "$": continue
+        
+        # Determine actual length of the substring (stops at the separator '$')
+        actual_len = combined.find("$", suffix_idx) - suffix_idx
+        
+        # Unique substrings are those with length > lcp[i]
+        if actual_len > lcp[i]:
+            new_count = actual_len - lcp[i]
+            total_distinct += new_count
+            # (Cumulative count, index in combined, starting length)
+            intervals.append((total_distinct, suffix_idx, lcp[i] + 1))
+
+    # 4. Process queries using binary search
+    results = []
+    import bisect
+    keys = [x[0] for x in intervals]
+    
+    for q in queries:
+        idx = bisect.bisect_left(keys, q)
+        if idx < len(intervals):
+            prev_count = keys[idx-1] if idx > 0 else 0
+            offset = q - prev_count
+            start_pos, min_len = intervals[idx][1], intervals[idx][2]
+            results.append(combined[start_pos : start_pos + min_len + offset - 1])
+        else:
+            results.append("INVALID")
+    return results
+
+if __name__ == '__main__':
+    # Use fast I/O to prevent "no response" errors
+    all_input = sys.stdin.read().split()
+    if all_input:
+        n = int(all_input[0])
+        w = all_input[1:n+1]
+        q_count = int(all_input[n+1])
+        queries = [int(x) for x in all_input[n+2:]]
+        
+        output = findStrings(w, queries)
+        for line in output:
+            sys.stdout.write(line + "\n")
