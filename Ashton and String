@@ -1,0 +1,68 @@
+import sys
+
+def ashtonString(s, k):
+    n = len(s)
+    k -= 1  # Convert to 0-indexed
+    
+    # 1. Build Suffix Array in O(N log N)
+    sa = list(range(n))
+    rank = [ord(c) for c in s]
+    tmp = [0] * n
+    length = 1
+    while length < n:
+        # Sort suffixes by rank pairs
+        sa.sort(key=lambda x: (rank[x], rank[x + length] if x + length < n else -1))
+        tmp[sa[0]] = 0
+        for i in range(1, n):
+            prev, curr = sa[i-1], sa[i]
+            p1 = (rank[prev], rank[prev + length] if prev + length < n else -1)
+            p2 = (rank[curr], rank[curr + length] if curr + length < n else -1)
+            tmp[curr] = tmp[prev] + (1 if p1 < p2 else 0)
+        rank = tmp[:]
+        if rank[sa[n-1]] == n - 1: break
+        length *= 2
+
+    # 2. Build LCP Array (Kasai's Algorithm)
+    lcp = [0] * n
+    r = [0] * n
+    for i in range(n): r[sa[i]] = i
+    h = 0
+    for i in range(n):
+        if r[i] > 0:
+            j = sa[r[i] - 1]
+            while i + h < n and j + h < n and s[i+h] == s[j+h]:
+                h += 1
+            lcp[r[i]] = h
+            if h > 0: h -= 1
+
+    # 3. K-th Character Logic
+    tri = lambda x: (x * (x + 1)) // 2
+    for i in range(n):
+        suffix_len = n - sa[i]
+        prev_lcp = lcp[i]
+        added_chars = tri(suffix_len) - tri(prev_lcp)
+        
+        if k < added_chars:
+            # Locate the exact prefix length contributing the character
+            for length in range(prev_lcp + 1, suffix_len + 1):
+                if k < length:
+                    return s[sa[i] + int(k)]
+                k -= length
+        else:
+            k -= added_chars
+
+# Standard HackerRank input handling
+if __name__ == '__main__':
+    # Increase recursion depth for deep Kasai/Suffix logic if needed
+    sys.setrecursionlimit(200000)
+    
+    input_data = sys.stdin.read().split()
+    if input_data:
+        t = int(input_data[0])
+        ptr = 1
+        for _ in range(t):
+            s = input_data[ptr]
+            k = int(input_data[ptr + 1])
+            print(ashtonString(s, k))
+            ptr += 2
+
